@@ -1,0 +1,13 @@
+# Torrent dependencies
+libtorrent
+
+# Google Drive dependencies
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+
+# UI and utilities
+tqdm
+
+# Optional: For Google Colab
+# google-colab (automatically available in Colab)
