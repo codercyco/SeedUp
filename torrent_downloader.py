@@ -187,9 +187,10 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
             time.sleep(1)
 
     except KeyboardInterrupt:
+        pbar.close()
+        print()  # New line after progress bar
         logger.warning("Download paused by user. Session saved for resume.")
         save_session(ses, session_file)
-        pbar.close()
         return None
     
     pbar.close()
