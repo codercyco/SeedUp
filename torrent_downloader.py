@@ -121,18 +121,42 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
     # Initialize progress bar
     with tqdm(total=100, desc="Download Progress", unit="%",
               bar_format="{l_bar}{bar} {n:.1f}/{total_fmt}% [{postfix}]", 
-              ncols=100) as pbar:
+              ncols=120) as pbar:
         try:
             while handle.status().state != lt.torrent_status.seeding:
                 s = handle.status()
                 progress = s.progress * 100
+
+                # Calculate ETA
+                eta_str = "N/A"
+                if s.download_rate > 0:
+                    total_size = s.total_wanted
+                    downloaded = s.total_done
+                    remaining = total_size - downloaded
+                    eta_seconds = remaining / s.download_rate
+                    
+                    if eta_seconds < 60:
+                        eta_str = f"{int(eta_seconds)}s"
+                    elif eta_seconds < 3600:
+                        eta_str = f"{int(eta_seconds / 60)}m {int(eta_seconds % 60)}s"
+                    else:
+                        hours = int(eta_seconds / 3600)
+                        minutes = int((eta_seconds % 3600) / 60)
+                        eta_str = f"{hours}h {minutes}m"
+
+                # Format download speed
+                if s.download_rate > 1024 * 1024:  # > 1 MB/s
+                    speed_str = f"{s.download_rate / (1024 * 1024):.2f} MB/s"
+                else:
+                    speed_str = f"{s.download_rate / 1024:.2f} KB/s"
 
                 # Update progress bar
                 pbar.n = progress
                 pbar.set_postfix({
                     "Seeds": s.num_seeds,
                     "Peers": s.num_peers - s.num_seeds,
-                    "Speed": f"{s.download_rate / 1024:.2f} KB/s"
+                    "Speed": speed_str,
+                    "ETA": eta_str
                 })
                 pbar.refresh()
 

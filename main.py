@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 from torrent_downloader import download_torrent, get_download_status, clear_session
-from gdrive_uploader import upload_to_google_drive, PatternMatcher, ProgressTracker
+#from gdrive_uploader import upload_to_google_drive, PatternMatcher, ProgressTracker
 from config import ConfigManager, TORRENT_DOWNLOAD_PATH, get_logger
 
 logger = get_logger(__name__)
