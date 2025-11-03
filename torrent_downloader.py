@@ -118,58 +118,63 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
     torrent_name = handle.status().name
     logger.info(f"Downloading: {torrent_name}")
 
-    # Initialize progress bar
-    with tqdm(total=100, desc="Download Progress", unit="%",
-              bar_format="{l_bar}{bar} {n:.1f}/{total_fmt}% [{postfix}]", 
-              ncols=120) as pbar:
-        try:
-            while handle.status().state != lt.torrent_status.seeding:
-                s = handle.status()
-                progress = s.progress * 100
+    # Initialize progress bar with fully custom format (no postfix to avoid comma)
+    pbar = tqdm(total=100, desc="", unit="", bar_format="", ncols=120)
+    
+    try:
+        while handle.status().state != lt.torrent_status.seeding:
+            s = handle.status()
+            progress = s.progress * 100
 
-                # Calculate ETA
-                eta_str = "N/A"
-                if s.download_rate > 0:
-                    total_size = s.total_wanted
-                    downloaded = s.total_done
-                    remaining = total_size - downloaded
-                    eta_seconds = remaining / s.download_rate
-                    
-                    if eta_seconds < 60:
-                        eta_str = f"{int(eta_seconds)}s"
-                    elif eta_seconds < 3600:
-                        eta_str = f"{int(eta_seconds / 60)}m {int(eta_seconds % 60)}s"
-                    else:
-                        hours = int(eta_seconds / 3600)
-                        minutes = int((eta_seconds % 3600) / 60)
-                        eta_str = f"{hours}h {minutes}m"
-
-                # Format download speed
-                if s.download_rate > 1024 * 1024:  # > 1 MB/s
-                    speed_str = f"{s.download_rate / (1024 * 1024):.2f} MB/s"
-                else:
-                    speed_str = f"{s.download_rate / 1024:.2f} KB/s"
-
-                # Update progress bar
-                pbar.n = progress
-                pbar.set_postfix({
-                    "Seeds": s.num_seeds,
-                    "Peers": s.num_peers - s.num_seeds,
-                    "Speed": speed_str,
-                    "ETA": eta_str
-                })
-                pbar.refresh()
-
-                # Save session periodically (every 10 seconds)
-                if int(time.time()) % 10 == 0:
-                    save_session(ses, session_file)
+            # Calculate ETA
+            eta_str = "N/A"
+            if s.download_rate > 0:
+                total_size = s.total_wanted
+                downloaded = s.total_done
+                remaining = total_size - downloaded
+                eta_seconds = remaining / s.download_rate
                 
-                time.sleep(1)
+                if eta_seconds < 60:
+                    eta_str = f"{int(eta_seconds)}s"
+                elif eta_seconds < 3600:
+                    eta_str = f"{int(eta_seconds / 60)}m {int(eta_seconds % 60)}s"
+                else:
+                    hours = int(eta_seconds / 3600)
+                    minutes = int((eta_seconds % 3600) / 60)
+                    eta_str = f"{hours}h {minutes}m"
 
-        except KeyboardInterrupt:
-            logger.warning("Download paused by user. Session saved for resume.")
-            save_session(ses, session_file)
-            return None
+            # Format download speed
+            if s.download_rate > 1024 * 1024:  # > 1 MB/s
+                speed_str = f"{s.download_rate / (1024 * 1024):.2f} MB/s"
+            else:
+                speed_str = f"{s.download_rate / 1024:.2f} KB/s"
+
+            # Build complete progress bar string manually
+            bar_length = 30
+            filled_length = int(bar_length * progress / 100)
+            bar = '█' * filled_length + '░' * (bar_length - filled_length)
+            
+            stats_str = f"Seeds: {s.num_seeds} | Peers: {s.num_peers - s.num_seeds} | Speed: {speed_str} | ETA: {eta_str} |"
+            progress_line = f"\rDownload Progress: {bar} {progress:.1f}/100%    | {stats_str}"
+            
+            # Update tqdm display
+            pbar.n = progress
+            pbar.set_description_str(progress_line)
+            pbar.refresh()
+
+            # Save session periodically (every 10 seconds)
+            if int(time.time()) % 10 == 0:
+                save_session(ses, session_file)
+            
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        logger.warning("Download paused by user. Session saved for resume.")
+        save_session(ses, session_file)
+        pbar.close()
+        return None
+    
+    pbar.close()
 
     logger.info("Download complete!")
     
