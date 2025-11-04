@@ -19,7 +19,7 @@ MAX_WORKERS = 3  # Number of parallel uploads
 PROGRESS_FILE = '.gdrive_upload_progress.json'
 CONFIG_FILE = '.gdrive-uploader.conf'
 TOKEN_FILE = 'token.pickle'
-CREDENTIALS_FILE = 'credentials.json'
+CREDENTIALS_FILE = 'credentials.dat'
 GOOGLE_DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 # Logging Configuration
