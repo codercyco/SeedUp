@@ -40,9 +40,26 @@ def authenticate_google_drive():
         )
     
     try:
+        from google.auth import default
+        from google.auth.transport.requests import Request
+        
+        # Authenticate user in Colab
         auth.authenticate_user()
-        logger.info("Authenticated via Google Colab")
-        return build('drive', 'v3')
+        logger.info("User authenticated via Google Colab")
+        
+        # Get credentials
+        credentials, project = default()
+        
+        # Refresh credentials if needed
+        if credentials.expired or not credentials.valid:
+            credentials.refresh(Request())
+            logger.info("Credentials refreshed")
+        
+        # Build and return Drive service
+        service = build('drive', 'v3', credentials=credentials)
+        logger.info("Google Drive service initialized successfully")
+        return service
+        
     except Exception as e:
         logger.error(f"Authentication failed: {str(e)}")
         raise RuntimeError(f"Failed to authenticate with Google Drive: {str(e)}")
@@ -395,21 +412,3 @@ def upload_to_google_drive(local_path: str, folder_id: str, **kwargs):
     uploader.print_summary(results)
     
     return results
-
-
-# Compatibility classes for main.py
-class PatternMatcher:
-    """Stub class for compatibility (not implemented in simple version)."""
-    def __init__(self, include_patterns=None, exclude_patterns=None):
-        logger.warning("PatternMatcher not implemented in simple uploader")
-        pass
-
-
-class ProgressTracker:
-    """Stub class for compatibility (not implemented in simple version)."""
-    def __init__(self):
-        logger.warning("ProgressTracker not implemented in simple uploader")
-        pass
-    
-    def clear(self):
-        pass
