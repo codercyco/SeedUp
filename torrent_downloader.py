@@ -66,6 +66,9 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
         os.makedirs(download_path)
         logger.info(f"Created download directory: {download_path}")
 
+    # Check if we're resuming from a previous session
+    is_resuming = auto_resume and os.path.exists(session_file)
+
     # Load existing session or create new one
     ses = load_session(session_file) if auto_resume else lt.session()
 
@@ -121,10 +124,6 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
     # Initialize progress bar with fully custom format (no postfix to avoid comma)
     pbar = tqdm(total=100, desc="", unit="", bar_format="", ncols=120)
     
-    # Track if we're resuming
-    first_iteration = True
-    resume_message_shown = False
-    
     try:
         while handle.status().state != lt.torrent_status.seeding:
             s = handle.status()
@@ -158,20 +157,14 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
             filled_length = int(bar_length * progress / 100)
             bar = '█' * filled_length + '░' * (bar_length - filled_length)
             
-            # Change label based on state
-            if first_iteration and progress > 5:
-                # Show "Resuming Download" for first few iterations if progress > 5%
+            # Determine label based on actual state
+            if is_resuming and progress < 95:
                 label = "Resuming Download"
-                first_iteration = False
-                resume_message_shown = True
-            elif resume_message_shown and not first_iteration:
-                # Show for 2 more seconds after first iteration
-                label = "Resuming Download"
-                resume_message_shown = False
             elif s.download_rate == 0 and s.num_peers == 0:
                 label = "Connecting to Peers"
             else:
                 label = "Download Progress"
+                is_resuming = False  # No longer resuming once we're actively downloading
             
             stats_str = f"Seeds: {s.num_seeds} | Peers: {s.num_peers - s.num_seeds} | Speed: {speed_str} | ETA: {eta_str} |"
             progress_line = f"\r{label}: {bar} {progress:.1f}/100%    | {stats_str}"
