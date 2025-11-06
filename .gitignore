@@ -50,7 +50,6 @@ downloads/
 *.torrent
 
 torrent_downloader_*.py
-gdrive*
 *.md
 # OS generated files
 Thumbs.db

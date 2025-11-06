@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for torrent downloader with optional Google Drive upload.
+Main entry point for torrent downloader with Google Drive upload (Colab-optimized).
 Combines torrent downloading and cloud storage capabilities.
 """
 
@@ -10,16 +10,35 @@ import os
 from pathlib import Path
 
 from torrent_downloader import download_torrent, get_download_status, clear_session
-#from gdrive_uploader import upload_to_google_drive, PatternMatcher, ProgressTracker
 from config import ConfigManager, TORRENT_DOWNLOAD_PATH, get_logger
 
 logger = get_logger(__name__)
+
+# Check environment and import uploader only when needed
+def get_uploader():
+    """Import and return uploader module, checking environment first."""
+    try:
+        from gdrive_uploader import upload_to_google_drive
+        return upload_to_google_drive
+    except RuntimeError as e:
+        # Raised by gdrive_uploader if not in Colab
+        logger.error(f"Upload not available: {str(e)}")
+        print("\n" + "="*60)
+        print("ERROR: Google Drive upload requires Google Colab")
+        print("="*60)
+        print("This feature only works in Google Colab environment.")
+        print("Please run this script in Colab to use upload features.")
+        print("="*60)
+        raise
+    except Exception as e:
+        logger.error(f"Failed to load uploader: {str(e)}")
+        raise
 
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Download torrents and optionally upload to Google Drive',
+        description='Download torrents and upload to Google Drive (Colab-optimized)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -27,20 +46,22 @@ Examples:
   python main.py download -t movie.torrent
   python main.py download -t "magnet:?xt=urn:btih:..."
   
-  # Download and upload to Google Drive
+  # Download and upload to Google Drive (Colab only)
   python main.py download -t movie.torrent --upload -f FOLDER_ID
   
-  # Upload existing files to Google Drive
+  # Upload existing files to Google Drive (Colab only)
   python main.py upload -p /path/to/folder -f FOLDER_ID
   
-  # Upload with filters
-  python main.py upload -p /path -f FOLDER_ID --include "*.mp4" --exclude "*.tmp"
+  # Upload without skipping existing files
+  python main.py upload -p /path -f FOLDER_ID --no-skip
   
   # Check for paused downloads
   python main.py status
   
   # Clear download session
   python main.py clear
+  
+Note: Upload features require Google Colab environment
         """
     )
     
@@ -68,7 +89,7 @@ Examples:
     download_parser.add_argument(
         '--upload',
         action='store_true',
-        help='Upload to Google Drive after download'
+        help='Upload to Google Drive after download (Colab only)'
     )
     download_parser.add_argument(
         '-f', '--folder-id',
@@ -76,19 +97,13 @@ Examples:
         help='Google Drive folder ID (required with --upload)'
     )
     download_parser.add_argument(
-        '--skip-existing',
+        '--no-skip',
         action='store_true',
-        default=True,
-        help='Skip files that already exist in Drive (default: True)'
-    )
-    download_parser.add_argument(
-        '--parallel',
-        action='store_true',
-        help='Use parallel uploads for faster performance'
+        help='Force re-upload even if files exist in Drive'
     )
     
     # Upload command
-    upload_parser = subparsers.add_parser('upload', help='Upload files to Google Drive')
+    upload_parser = subparsers.add_parser('upload', help='Upload files to Google Drive (Colab only)')
     upload_parser.add_argument(
         '-p', '--path',
         type=str,
@@ -104,34 +119,7 @@ Examples:
     upload_parser.add_argument(
         '--no-skip',
         action='store_true',
-        help='Force re-upload even if files exist'
-    )
-    upload_parser.add_argument(
-        '--parallel',
-        action='store_true',
-        help='Enable parallel uploads for faster performance'
-    )
-    upload_parser.add_argument(
-        '--include',
-        type=str,
-        action='append',
-        help='Include only files matching pattern (can be used multiple times)'
-    )
-    upload_parser.add_argument(
-        '--exclude',
-        type=str,
-        action='append',
-        help='Exclude files matching pattern (can be used multiple times)'
-    )
-    upload_parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Preview what would be uploaded without actually uploading'
-    )
-    upload_parser.add_argument(
-        '--no-resume',
-        action='store_true',
-        help='Clear previous upload progress and start fresh'
+        help='Force re-upload even if files exist in Drive'
     )
     
     # Status command
@@ -174,19 +162,28 @@ def handle_download(args):
         print("UPLOADING TO GOOGLE DRIVE")
         print("="*60)
         
-        results = upload_to_google_drive(
-            downloaded_path,
-            args.folder_id,
-            skip_existing=args.skip_existing,
-            parallel=args.parallel,
-            use_progress=True
-        )
-        
-        if results['failed']:
-            logger.warning("Some files failed to upload")
+        try:
+            # Load uploader (will check environment)
+            upload_to_google_drive = get_uploader()
+            
+            results = upload_to_google_drive(
+                downloaded_path,
+                args.folder_id,
+                skip_existing=not args.no_skip
+            )
+            
+            if results['failed']:
+                logger.warning(f"Some files failed to upload ({len(results['failed'])} items)")
+                return 1
+            
+            logger.info("Upload completed successfully!")
+            
+        except RuntimeError:
+            # Environment check failed
             return 1
-        
-        logger.info("Upload completed successfully!")
+        except Exception as e:
+            logger.error(f"Upload failed: {str(e)}")
+            return 1
     
     return 0
 
@@ -197,34 +194,35 @@ def handle_upload(args):
     print("GOOGLE DRIVE UPLOADER")
     print("="*60)
     
-    # Clear progress if requested
-    if args.no_resume:
-        ProgressTracker().clear()
-        logger.info("Previous upload progress cleared")
-    
-    # Setup pattern matcher if needed
-    pattern_matcher = None
-    if args.include or args.exclude:
-        pattern_matcher = PatternMatcher(args.include, args.exclude)
-    
-    # Upload to Google Drive
-    results = upload_to_google_drive(
-        args.path,
-        args.folder_id,
-        skip_existing=not args.no_skip,
-        parallel=args.parallel,
-        include_patterns=args.include,
-        exclude_patterns=args.exclude,
-        dry_run=args.dry_run,
-        use_progress=not args.no_resume
-    )
-    
-    if results['failed']:
-        logger.warning("Some files failed to upload")
+    # Validate path exists
+    if not os.path.exists(args.path):
+        logger.error(f"Path does not exist: {args.path}")
         return 1
     
-    logger.info(f"{'Dry run' if args.dry_run else 'Upload'} completed successfully!")
-    return 0
+    # Upload to Google Drive
+    try:
+        # Load uploader (will check environment)
+        upload_to_google_drive = get_uploader()
+        
+        results = upload_to_google_drive(
+            args.path,
+            args.folder_id,
+            skip_existing=not args.no_skip
+        )
+        
+        if results['failed']:
+            logger.warning(f"Some files failed to upload ({len(results['failed'])} items)")
+            return 1
+        
+        logger.info("Upload completed successfully!")
+        return 0
+    
+    except RuntimeError:
+        # Environment check failed
+        return 1
+    except Exception as e:
+        logger.error(f"Upload failed: {str(e)}")
+        return 1
 
 
 def handle_status(args):
@@ -276,8 +274,6 @@ def main():
         print("\n\nOperation cancelled by user")
         if args.command == 'download':
             print("Download progress has been saved. Resume with the same command.")
-        elif args.command == 'upload':
-            print("Upload progress has been saved. Use the same command to resume.")
         return 130
     except Exception as e:
         logger.error(f"Operation failed: {str(e)}", exc_info=True)
