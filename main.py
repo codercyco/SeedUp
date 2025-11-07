@@ -14,24 +14,20 @@ from config import ConfigManager, TORRENT_DOWNLOAD_PATH, get_logger
 
 logger = get_logger(__name__)
 
-# Check environment and import uploader only when needed
+
 def get_uploader():
-    """Import and return uploader module, checking environment first."""
+    """Import and return uploader module."""
     try:
         from gdrive_uploader import upload_to_google_drive
         return upload_to_google_drive
-    except RuntimeError as e:
-        # Raised by gdrive_uploader if not in Colab
-        logger.error(f"Upload not available: {str(e)}")
+    except ImportError as e:
+        logger.error(f"Failed to import uploader: {str(e)}")
         print("\n" + "="*60)
-        print("ERROR: Google Drive upload requires Google Colab")
+        print("ERROR: Failed to import Google Drive uploader")
         print("="*60)
-        print("This feature only works in Google Colab environment.")
-        print("Please run this script in Colab to use upload features.")
+        print("Please ensure all required packages are installed:")
+        print("  pip install google-auth-oauthlib google-auth-httplib2 google-api-python-client")
         print("="*60)
-        raise
-    except Exception as e:
-        logger.error(f"Failed to load uploader: {str(e)}")
         raise
 
 
@@ -61,7 +57,16 @@ Examples:
   # Clear download session
   python main.py clear
   
-Note: Upload features require Google Colab environment
+Note: Upload features require Google Colab environment and authentication.
+Run this in a Colab notebook cell first:
+  
+  from google.colab import auth
+  from googleapiclient.discovery import build
+  auth.authenticate_user()
+  drive_service = build('drive', 'v3')
+  
+  from gdrive_uploader import set_drive_service
+  set_drive_service(drive_service)
         """
     )
     
@@ -163,7 +168,7 @@ def handle_download(args):
         print("="*60)
         
         try:
-            # Load uploader (will check environment)
+            # Load uploader
             upload_to_google_drive = get_uploader()
             
             results = upload_to_google_drive(
@@ -178,8 +183,9 @@ def handle_download(args):
             
             logger.info("Upload completed successfully!")
             
-        except RuntimeError:
-            # Environment check failed
+        except RuntimeError as e:
+            # This catches the "service not initialized" error
+            print(f"\n{e}")
             return 1
         except Exception as e:
             logger.error(f"Upload failed: {str(e)}")
@@ -201,7 +207,7 @@ def handle_upload(args):
     
     # Upload to Google Drive
     try:
-        # Load uploader (will check environment)
+        # Load uploader
         upload_to_google_drive = get_uploader()
         
         results = upload_to_google_drive(
@@ -217,8 +223,9 @@ def handle_upload(args):
         logger.info("Upload completed successfully!")
         return 0
     
-    except RuntimeError:
-        # Environment check failed
+    except RuntimeError as e:
+        # This catches the "service not initialized" error
+        print(f"\n{e}")
         return 1
     except Exception as e:
         logger.error(f"Upload failed: {str(e)}")
