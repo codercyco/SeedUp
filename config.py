@@ -8,7 +8,7 @@ import logging
 
 # Torrent Downloader Configuration
 TORRENT_SESSION_FILE = "torrent_session.json"
-TORRENT_DOWNLOAD_PATH = "downloads"
+TORRENT_DOWNLOAD_PATH = "../SeedUp Downloads"
 
 # Google Drive Uploader Configuration
 CHUNK_SIZE = 100 * 1024 * 1024  # 100MB chunks for large files
