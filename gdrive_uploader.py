@@ -10,6 +10,15 @@ import os
 import mimetypes
 from typing import Dict, List, Optional
 from tqdm import tqdm
+import logging
+
+# Suppress Google Cloud warnings
+logging.getLogger('google.auth._default').setLevel(logging.ERROR)
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+os.environ['GOOGLE_CLOUD_PROJECT'] = 'dummy-project'
+import warnings
+warnings.filterwarnings("ignore", message="No project ID could be determined")
+warnings.filterwarnings("ignore", message="file_cache is only supported with oauth2client")
 
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
@@ -17,6 +26,8 @@ from googleapiclient.errors import HttpError
 from config import get_logger
 
 logger = get_logger(__name__)
+# Suppress INFO level logging to reduce verbose output
+logger.setLevel(logging.WARNING)
 
 # Check if running in Google Colab
 try:
@@ -42,11 +53,13 @@ def get_drive_service():
         raise RuntimeError("Not running in Google Colab environment")
     
     try:
-        # Authenticate and build service directly like your working script
-        auth.authenticate_user()
-        drive_service = build('drive', 'v3')
-        logger.info("Google Drive service authenticated successfully")
-        return drive_service
+        # Suppress warnings during authentication
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # Authenticate and build service directly like your working script
+            auth.authenticate_user()
+            drive_service = build('drive', 'v3')
+            return drive_service
     except Exception as e:
         raise RuntimeError(f"Failed to authenticate Google Drive: {str(e)}")
 
@@ -71,7 +84,6 @@ class SimpleDriveUploader:
         """
         self.drive_service = get_drive_service()
         self.skip_existing = skip_existing
-        logger.info("Successfully initialized with Google Drive service")
     
     def file_exists(self, file_name: str, parent_id: str) -> Optional[Dict]:
         """
@@ -153,7 +165,6 @@ class SimpleDriveUploader:
         if self.skip_existing:
             existing = self.file_exists(file_name, parent_id)
             if existing:
-                logger.info(f"Skipping '{file_name}' - already exists in Drive")
                 return existing['id']
         
         # Detect MIME type
@@ -177,30 +188,12 @@ class SimpleDriveUploader:
                 fields='id'
             )
             
-            # Upload with progress bar
-            total_size = os.path.getsize(local_path)
-            with tqdm(
-                total=total_size,
-                unit='B',
-                unit_scale=True,
-                desc=f"Uploading {file_name}"
-            ) as pbar:
-                response = None
-                previous_uploaded = 0
-                
-                while response is None:
-                    status, response = request.next_chunk()
-                    if status:
-                        uploaded = status.resumable_progress
-                        pbar.update(uploaded - previous_uploaded)
-                        previous_uploaded = uploaded
-                
-                # Ensure progress bar reaches 100%
-                if previous_uploaded < total_size:
-                    pbar.update(total_size - previous_uploaded)
+            # Upload without individual progress bar
+            response = None
+            while response is None:
+                status, response = request.next_chunk()
             
             file_id = response.get('id')
-            logger.info(f"Successfully uploaded '{file_name}' (ID: {file_id})")
             return file_id
             
         except HttpError as e:
@@ -225,7 +218,6 @@ class SimpleDriveUploader:
         if self.skip_existing:
             existing_id = self.folder_exists(folder_name, parent_id)
             if existing_id:
-                logger.info(f"Folder '{folder_name}' already exists (ID: {existing_id})")
                 return existing_id
         
         try:
@@ -239,7 +231,6 @@ class SimpleDriveUploader:
                 fields='id'
             ).execute()
             folder_id = folder.get('id')
-            logger.info(f"Created folder '{folder_name}' (ID: {folder_id})")
             return folder_id
         except Exception as e:
             logger.error(f"Error creating folder '{folder_name}': {str(e)}")
@@ -285,8 +276,12 @@ class SimpleDriveUploader:
     def upload_to_drive(
         self,
         local_path: str,
-        parent_id: str
-    ) -> Dict[str, List[str]]:
+        parent_id: str,
+        _progress_bar=None,
+        _total_size=None,
+        _uploaded_size=[0],
+        _file_count=[0, 0]  # [current, total]
+    ) -> Dict[str, any]:
         """
         Upload a file or folder to Google Drive recursively.
         
@@ -295,34 +290,65 @@ class SimpleDriveUploader:
             parent_id: Google Drive folder ID where content will be uploaded
             
         Returns:
-            Dictionary with 'success', 'failed', and 'skipped' lists of paths
+            Dictionary with 'success', 'failed', 'skipped' lists and 'root_folder_id'
         """
-        results = {'success': [], 'failed': [], 'skipped': []}
+        results = {'success': [], 'failed': [], 'skipped': [], 'root_folder_id': parent_id}
         
         # Validate path
         if not os.path.exists(local_path):
-            logger.error(f"Path does not exist: {local_path}")
             results['failed'].append(local_path)
             return results
         
-        # Show statistics
-        stats = self.count_items(local_path)
-        logger.info(f"Total items to upload: {stats['files']} files, {stats['folders']} folders")
-        logger.info(f"Total size: {stats['total_size'] / (1024**3):.2f} GB")
+        # Initialize progress tracking on first call
+        if _progress_bar is None:
+            stats = self.count_items(local_path)
+            _total_size = stats['total_size']
+            _file_count[1] = stats['files']  # total files
+            _uploaded_size[0] = 0
+            _file_count[0] = 0  # current file count
+            
+            size_mb = _total_size / (1024 * 1024)
+            print(f"📤 Uploading {stats['files']} files ({size_mb:.1f} MB)")
+            _progress_bar = tqdm(
+                total=_total_size,
+                unit='B',
+                unit_scale=True,
+                unit_divisor=1024,
+                desc="Upload",
+                bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{rate_fmt}] {postfix}",
+                disable=False,
+                leave=True,
+                ncols=100
+            )
         
         # Upload file
         if os.path.isfile(local_path):
             file_name = os.path.basename(local_path)
+            file_size = os.path.getsize(local_path)
             existing = self.file_exists(file_name, parent_id) if self.skip_existing else None
             
             if existing:
                 results['skipped'].append(local_path)
+                # Update progress even for skipped files
+                if _progress_bar:
+                    _uploaded_size[0] += file_size
+                    _file_count[0] += 1
+                    _progress_bar.set_postfix_str(f"Files: {_file_count[0]}/{_file_count[1]}")
+                    _progress_bar.update(file_size)
             else:
                 file_id = self.upload_file(local_path, parent_id)
                 if file_id:
                     results['success'].append(local_path)
                 else:
                     results['failed'].append(local_path)
+                
+                # Update progress after upload
+                if _progress_bar:
+                    _uploaded_size[0] += file_size
+                    _file_count[0] += 1
+                    _progress_bar.set_postfix_str(f"Files: {_file_count[0]}/{_file_count[1]}")
+                    _progress_bar.update(file_size)
+                
             return results
         
         # Upload directory
@@ -331,41 +357,56 @@ class SimpleDriveUploader:
             folder_id = self.create_folder(folder_name, parent_id)
             
             if folder_id:
+                # Store the created folder ID as root folder for this upload
+                results['root_folder_id'] = folder_id
+                
                 # Recursively upload all items in the folder
                 try:
                     for item in os.listdir(local_path):
                         item_path = os.path.join(local_path, item)
-                        sub_results = self.upload_to_drive(item_path, folder_id)
+                        sub_results = self.upload_to_drive(item_path, folder_id, _progress_bar, _total_size, _uploaded_size, _file_count)
                         results['success'].extend(sub_results['success'])
                         results['failed'].extend(sub_results['failed'])
                         results['skipped'].extend(sub_results['skipped'])
                 except Exception as e:
-                    logger.error(f"Error processing folder '{local_path}': {str(e)}")
                     results['failed'].append(local_path)
             else:
                 results['failed'].append(local_path)
             
+            # Close progress bar if this is the root call and we're done
+            if _progress_bar and _file_count[0] >= _file_count[1]:
+                _progress_bar.close()
+                print()  # Add newline after progress bar
+                
             return results
         
-        logger.error(f"Path '{local_path}' is neither a file nor a directory")
+        # Close progress bar if this is the root call
+        if _progress_bar and _file_count[0] >= _file_count[1]:
+            _progress_bar.close()
+            print()  # Add newline after progress bar
+        
         results['failed'].append(local_path)
         return results
     
-    def print_summary(self, results: Dict[str, List[str]]):
-        """Print upload summary."""
+    def print_summary(self, results: Dict[str, List[str]], root_folder_id: str = None):
+        """Print clean upload summary with folder link."""
         print("\n" + "="*60)
-        print("UPLOAD SUMMARY")
+        print("🎉 UPLOAD COMPLETE")
         print("="*60)
-        print(f"Successful uploads: {len(results['success'])}")
-        print(f"Skipped (already exist): {len(results.get('skipped', []))}")
-        print(f"Failed uploads: {len(results['failed'])}")
+        
+        total_files = len(results['success']) + len(results.get('skipped', []))
+        print(f"✅ {len(results['success'])} files uploaded successfully")
+        
+        if results.get('skipped'):
+            print(f"⏭️  {len(results['skipped'])} files skipped (already exist)")
         
         if results['failed']:
-            print("\nFailed items:")
-            for item in results['failed'][:10]:
-                print(f"  - {item}")
-            if len(results['failed']) > 10:
-                print(f"  ... and {len(results['failed']) - 10} more")
+            print(f"❌ {len(results['failed'])} files failed")
+        
+        if root_folder_id:
+            folder_url = f"https://drive.google.com/drive/folders/{root_folder_id}"
+            print(f"\n📁 View uploaded files: {folder_url}")
+        
         print("="*60)
 
 
@@ -388,8 +429,10 @@ def upload_to_google_drive(local_path: str, folder_id: str, **kwargs):
     skip_existing = kwargs.get('skip_existing', True)
     
     uploader = SimpleDriveUploader(skip_existing=skip_existing)
-    
     results = uploader.upload_to_drive(local_path, folder_id)
-    uploader.print_summary(results)
+    
+    # Get the root folder ID for the summary link
+    root_folder_id = results.get('root_folder_id', folder_id)
+    uploader.print_summary(results, root_folder_id)
     
     return results
