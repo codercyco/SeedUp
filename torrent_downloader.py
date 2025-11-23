@@ -6,7 +6,6 @@ import libtorrent as lt
 import time
 import os
 import sys
-from tqdm import tqdm
 from config import TORRENT_SESSION_FILE, TORRENT_DOWNLOAD_PATH, get_logger
 
 logger = get_logger(__name__)
@@ -121,9 +120,6 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
     torrent_name = handle.status().name
     logger.info(f"Downloading: {torrent_name}")
 
-    # Initialize progress bar with fully custom format (no postfix to avoid comma)
-    pbar = tqdm(total=100, desc="", unit="", bar_format="", ncols=120)
-    
     try:
         while handle.status().state != lt.torrent_status.seeding:
             s = handle.status()
@@ -166,13 +162,11 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
                 label = "Download Progress"
                 is_resuming = False  # No longer resuming once we're actively downloading
             
-            stats_str = f"Seeds: {s.num_seeds} | Peers: {s.num_peers - s.num_seeds} | Speed: {speed_str} | ETA: {eta_str} |"
-            progress_line = f"\r{label}: {bar} {progress:.1f}/100%    | {stats_str}"
+            stats_str = f"Seeds: {s.num_seeds} | Peers: {s.num_peers - s.num_seeds} | Speed: {speed_str} | ETA: {eta_str}"
+            progress_line = f"{label}: {bar} {progress:.1f}/100%    | {stats_str}"
             
-            # Update tqdm display
-            pbar.n = progress
-            pbar.set_description_str(progress_line)
-            pbar.refresh()
+            # Use simple print instead of tqdm to avoid interference
+            print(f"\r{progress_line}", end="", flush=True)
 
             # Save session periodically (every 10 seconds)
             if int(time.time()) % 10 == 0:
@@ -181,13 +175,12 @@ def download_torrent(source, download_path=TORRENT_DOWNLOAD_PATH,
             time.sleep(1)
 
     except KeyboardInterrupt:
-        pbar.close()
         print()  # New line after progress bar
         logger.warning("Download paused by user. Session saved for resume.")
         save_session(ses, session_file)
         return None
     
-    pbar.close()
+    print()  # New line after progress bar completion
 
     logger.info("Download complete!")
     
