@@ -28,6 +28,7 @@ logger = get_logger(__name__)
 
 # Global variable to store pre-authenticated service
 _DRIVE_SERVICE = None
+_ERROR_SHOWN = False
 
 # Environment check at module level
 try:
@@ -48,8 +49,9 @@ def set_drive_service(service):
     Args:
         service: Authenticated Google Drive service object
     """
-    global _DRIVE_SERVICE
+    global _DRIVE_SERVICE, _ERROR_SHOWN
     _DRIVE_SERVICE = service
+    _ERROR_SHOWN = False  # Reset error flag when service is set
     logger.info("Pre-authenticated Drive service registered")
 
 
@@ -77,24 +79,30 @@ def get_drive_service():
     
     # Then check if service was initialized
     if _DRIVE_SERVICE is None:
-        error_msg = (
-            "\n" + "="*60 + "\n"
-            "ERROR: Google Drive service not initialized!\n"
-            "="*60 + "\n"
-            "You must authenticate in a Colab notebook cell BEFORE running this command.\n\n"
-            "Run this in a notebook cell:\n\n"
-            "  from google.colab import auth\n"
-            "  from googleapiclient.discovery import build\n"
-            "  auth.authenticate_user()\n"
-            "  drive_service = build('drive', 'v3')\n\n"
-            "  from gdrive_uploader import set_drive_service\n"
-            "  set_drive_service(drive_service)\n"
-            "  print('✓ Ready to upload!')\n\n"
-            "Then run your command:\n\n"
-            "  !python main.py upload -p '/path/to/files' -f 'FOLDER_ID'\n"
-            + "="*60
-        )
-        raise RuntimeError(error_msg)
+        global _ERROR_SHOWN
+        if not _ERROR_SHOWN:
+            _ERROR_SHOWN = True
+            error_msg = (
+                "\n" + "="*60 + "\n"
+                "ERROR: Google Drive service not initialized!\n"
+                "="*60 + "\n"
+                "You must authenticate in a Colab notebook cell BEFORE running this command.\n\n"
+                "Run this in a notebook cell:\n\n"
+                "  from google.colab import auth\n"
+                "  from googleapiclient.discovery import build\n"
+                "  auth.authenticate_user()\n"
+                "  drive_service = build('drive', 'v3')\n\n"
+                "  from gdrive_uploader import set_drive_service\n"
+                "  set_drive_service(drive_service)\n"
+                "  print('✓ Ready to upload!')\n\n"
+                "Then run your command:\n\n"
+                "  !python main.py upload -p '/path/to/files' -f 'FOLDER_ID'\n"
+                + "="*60
+            )
+            raise RuntimeError(error_msg)
+        else:
+            # Just raise a simple error on subsequent calls
+            raise RuntimeError("Google Drive service not initialized")
     
     return _DRIVE_SERVICE
 
@@ -117,7 +125,11 @@ class SimpleDriveUploader:
             self.drive_service = drive_service
         else:
             # This will raise RuntimeError with clear message if not set up
-            self.drive_service = get_drive_service()
+            try:
+                self.drive_service = get_drive_service()
+            except RuntimeError as e:
+                # Re-raise the error without creating multiple instances
+                raise e
         
         self.skip_existing = skip_existing
         logger.info("Successfully initialized with Google Drive service")
@@ -438,7 +450,11 @@ def upload_to_google_drive(local_path: str, folder_id: str, **kwargs):
     skip_existing = kwargs.get('skip_existing', True)
     drive_service = kwargs.get('drive_service', None)
     
-    uploader = SimpleDriveUploader(skip_existing=skip_existing, drive_service=drive_service)
+    try:
+        uploader = SimpleDriveUploader(skip_existing=skip_existing, drive_service=drive_service)
+    except RuntimeError as e:
+        # Don't retry, just raise the error immediately
+        raise e
     
     results = uploader.upload_to_drive(local_path, folder_id)
     uploader.print_summary(results)
