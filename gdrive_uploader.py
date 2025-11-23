@@ -29,6 +29,7 @@ logger = get_logger(__name__)
 # Global variable to store pre-authenticated service
 _DRIVE_SERVICE = None
 _ERROR_SHOWN = False
+_UPLOAD_IN_PROGRESS = False
 
 # Environment check at module level
 try:
@@ -49,9 +50,10 @@ def set_drive_service(service):
     Args:
         service: Authenticated Google Drive service object
     """
-    global _DRIVE_SERVICE, _ERROR_SHOWN
+    global _DRIVE_SERVICE, _ERROR_SHOWN, _UPLOAD_IN_PROGRESS
     _DRIVE_SERVICE = service
     _ERROR_SHOWN = False  # Reset error flag when service is set
+    _UPLOAD_IN_PROGRESS = False  # Reset upload flag when service is set
     logger.info("Pre-authenticated Drive service registered")
 
 
@@ -65,41 +67,21 @@ def get_drive_service():
     Raises:
         RuntimeError: If not in Colab or service has not been set
     """
+    # Add debug logging
+    logger.debug(f"get_drive_service called, IN_COLAB={IN_COLAB}, _DRIVE_SERVICE={'set' if _DRIVE_SERVICE else 'None'}")
+    
     # First check if we're in Colab
     if not IN_COLAB:
-        error_msg = (
-            "\n" + "="*60 + "\n"
-            "ERROR: Not running in Google Colab environment!\n"
-            "="*60 + "\n"
-            "Google Drive upload is only supported in Google Colab.\n"
-            "Please run this script in Colab to use upload features.\n"
-            + "="*60
-        )
-        raise RuntimeError(error_msg)
+        raise RuntimeError("Not running in Google Colab environment! Google Drive upload is only supported in Google Colab.")
     
     # Then check if service was initialized
     if _DRIVE_SERVICE is None:
         global _ERROR_SHOWN
+        logger.debug(f"Service not initialized, _ERROR_SHOWN={_ERROR_SHOWN}")
         if not _ERROR_SHOWN:
             _ERROR_SHOWN = True
-            error_msg = (
-                "\n" + "="*60 + "\n"
-                "ERROR: Google Drive service not initialized!\n"
-                "="*60 + "\n"
-                "You must authenticate in a Colab notebook cell BEFORE running this command.\n\n"
-                "Run this in a notebook cell:\n\n"
-                "  from google.colab import auth\n"
-                "  from googleapiclient.discovery import build\n"
-                "  auth.authenticate_user()\n"
-                "  drive_service = build('drive', 'v3')\n\n"
-                "  from gdrive_uploader import set_drive_service\n"
-                "  set_drive_service(drive_service)\n"
-                "  print('✓ Ready to upload!')\n\n"
-                "Then run your command:\n\n"
-                "  !python main.py upload -p '/path/to/files' -f 'FOLDER_ID'\n"
-                + "="*60
-            )
-            raise RuntimeError(error_msg)
+            # Use simple error message to avoid formatting issues
+            raise RuntimeError("Google Drive service not initialized! You must authenticate in a Colab notebook cell first.")
         else:
             # Just raise a simple error on subsequent calls
             raise RuntimeError("Google Drive service not initialized")
@@ -116,21 +98,15 @@ class SimpleDriveUploader:
         
         Args:
             skip_existing: If True, skip files that already exist in Drive
-            drive_service: Pre-authenticated Google Drive service (optional)
+            drive_service: Pre-authenticated Google Drive service (required)
             
         Raises:
-            RuntimeError: If not in Colab or service not available
+            RuntimeError: If drive_service is not provided
         """
-        if drive_service is not None:
-            self.drive_service = drive_service
-        else:
-            # This will raise RuntimeError with clear message if not set up
-            try:
-                self.drive_service = get_drive_service()
-            except RuntimeError as e:
-                # Re-raise the error without creating multiple instances
-                raise e
-        
+        if drive_service is None:
+            raise RuntimeError("Drive service is required")
+            
+        self.drive_service = drive_service
         self.skip_existing = skip_existing
         logger.info("Successfully initialized with Google Drive service")
     
@@ -447,16 +423,45 @@ def upload_to_google_drive(local_path: str, folder_id: str, **kwargs):
     Raises:
         RuntimeError: If not in Colab or service not initialized
     """
-    skip_existing = kwargs.get('skip_existing', True)
-    drive_service = kwargs.get('drive_service', None)
+    global _UPLOAD_IN_PROGRESS, _DRIVE_SERVICE
+    
+    # Prevent multiple concurrent uploads
+    if _UPLOAD_IN_PROGRESS:
+        raise RuntimeError("Upload already in progress")
+    
+    # Check requirements upfront without calling get_drive_service multiple times
+    if not IN_COLAB:
+        raise RuntimeError("Not running in Google Colab environment")
+    
+    if _DRIVE_SERVICE is None:
+        # Show detailed instructions only once
+        print("\n" + "="*60)
+        print("AUTHENTICATION REQUIRED")
+        print("="*60)
+        print("Please run this in a Colab notebook cell first:")
+        print()
+        print("from google.colab import auth")
+        print("from googleapiclient.discovery import build")
+        print("auth.authenticate_user()")
+        print("drive_service = build('drive', 'v3')")
+        print()
+        print("from gdrive_uploader import set_drive_service")
+        print("set_drive_service(drive_service)")
+        print("print('✓ Ready to upload!')")
+        print("="*60)
+        raise RuntimeError("Authentication required")
+        
+    _UPLOAD_IN_PROGRESS = True
     
     try:
+        skip_existing = kwargs.get('skip_existing', True)
+        drive_service = kwargs.get('drive_service', _DRIVE_SERVICE)
+        
         uploader = SimpleDriveUploader(skip_existing=skip_existing, drive_service=drive_service)
-    except RuntimeError as e:
-        # Don't retry, just raise the error immediately
-        raise e
-    
-    results = uploader.upload_to_drive(local_path, folder_id)
-    uploader.print_summary(results)
-    
-    return results
+        
+        results = uploader.upload_to_drive(local_path, folder_id)
+        uploader.print_summary(results)
+        
+        return results
+    finally:
+        _UPLOAD_IN_PROGRESS = False
