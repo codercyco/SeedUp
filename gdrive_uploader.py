@@ -2,16 +2,8 @@
 Simplified Google Drive uploader module for Colab environments.
 Based on direct Drive API usage with resumable uploads and progress tracking.
 
-NOTE: This module requires a pre-authenticated Google Drive service.
-Run this in a Colab notebook cell BEFORE using this module:
-
-    from google.colab import auth
-    from googleapiclient.discovery import build
-    auth.authenticate_user()
-    drive_service = build('drive', 'v3')
-    
-    from gdrive_uploader import set_drive_service
-    set_drive_service(drive_service)
+This module automatically handles authentication in Google Colab environments.
+No manual service setup required - just run your upload commands directly.
 """
 
 import os
@@ -26,87 +18,58 @@ from config import get_logger
 
 logger = get_logger(__name__)
 
-# Global variable to store pre-authenticated service
-_DRIVE_SERVICE = None
-_ERROR_SHOWN = False
-_UPLOAD_IN_PROGRESS = False
-
-# Environment check at module level
+# Check if running in Google Colab
 try:
     from google.colab import auth
+    from googleapiclient.discovery import build
     IN_COLAB = True
     logger.info("Running in Google Colab environment")
 except ImportError:
     IN_COLAB = False
     logger.warning("Not running in Google Colab - upload features unavailable")
 
-
-def set_drive_service(service):
-    """
-    Set a pre-authenticated Google Drive service.
-    
-    This should be called from the notebook cell before using any upload functions.
-    
-    Args:
-        service: Authenticated Google Drive service object
-    """
-    global _DRIVE_SERVICE, _ERROR_SHOWN, _UPLOAD_IN_PROGRESS
-    _DRIVE_SERVICE = service
-    _ERROR_SHOWN = False  # Reset error flag when service is set
-    _UPLOAD_IN_PROGRESS = False  # Reset upload flag when service is set
-    logger.info("Pre-authenticated Drive service registered")
-
-
 def get_drive_service():
     """
-    Get the pre-authenticated Google Drive service.
+    Get authenticated Google Drive service.
     
     Returns:
         Google Drive service object
         
     Raises:
-        RuntimeError: If not in Colab or service has not been set
+        RuntimeError: If not in Colab or authentication fails
     """
-    # Add debug logging
-    logger.debug(f"get_drive_service called, IN_COLAB={IN_COLAB}, _DRIVE_SERVICE={'set' if _DRIVE_SERVICE else 'None'}")
-    
-    # First check if we're in Colab
     if not IN_COLAB:
-        raise RuntimeError("Not running in Google Colab environment! Google Drive upload is only supported in Google Colab.")
+        raise RuntimeError("Not running in Google Colab environment")
     
-    # Then check if service was initialized
-    if _DRIVE_SERVICE is None:
-        global _ERROR_SHOWN
-        logger.debug(f"Service not initialized, _ERROR_SHOWN={_ERROR_SHOWN}")
-        if not _ERROR_SHOWN:
-            _ERROR_SHOWN = True
-            # Use simple error message to avoid formatting issues
-            raise RuntimeError("Google Drive service not initialized! You must authenticate in a Colab notebook cell first.")
-        else:
-            # Just raise a simple error on subsequent calls
-            raise RuntimeError("Google Drive service not initialized")
-    
-    return _DRIVE_SERVICE
+    try:
+        # Authenticate and build service directly like your working script
+        auth.authenticate_user()
+        drive_service = build('drive', 'v3')
+        logger.info("Google Drive service authenticated successfully")
+        return drive_service
+    except Exception as e:
+        raise RuntimeError(f"Failed to authenticate Google Drive: {str(e)}")
 
+
+# For backward compatibility - these functions are no longer needed but kept for existing code
+def set_drive_service(service):
+    """Legacy function - no longer needed with automatic authentication."""
+    logger.info("Drive service set (using automatic authentication)")
 
 class SimpleDriveUploader:
     """Simplified Google Drive uploader with progress bars and skip existing feature."""
     
-    def __init__(self, skip_existing: bool = True, drive_service=None):
+    def __init__(self, skip_existing: bool = True):
         """
-        Initialize the uploader.
+        Initialize the uploader with automatic authentication.
         
         Args:
             skip_existing: If True, skip files that already exist in Drive
-            drive_service: Pre-authenticated Google Drive service (required)
             
         Raises:
-            RuntimeError: If drive_service is not provided
+            RuntimeError: If not in Colab or authentication fails
         """
-        if drive_service is None:
-            raise RuntimeError("Drive service is required")
-            
-        self.drive_service = drive_service
+        self.drive_service = get_drive_service()
         self.skip_existing = skip_existing
         logger.info("Successfully initialized with Google Drive service")
     
@@ -408,60 +371,25 @@ class SimpleDriveUploader:
 
 def upload_to_google_drive(local_path: str, folder_id: str, **kwargs):
     """
-    Convenience function to upload files to Google Drive.
+    Upload files to Google Drive with automatic authentication.
     
     Args:
         local_path: Path to file or folder to upload
         folder_id: Google Drive destination folder ID
         **kwargs: Additional options:
             - skip_existing (bool): Skip files that already exist (default: True)
-            - drive_service: Pre-authenticated Drive service (optional)
         
     Returns:
         Dictionary with 'success', 'failed', and 'skipped' lists
         
     Raises:
-        RuntimeError: If not in Colab or service not initialized
+        RuntimeError: If not in Colab or authentication fails
     """
-    global _UPLOAD_IN_PROGRESS, _DRIVE_SERVICE
+    skip_existing = kwargs.get('skip_existing', True)
     
-    # Prevent multiple concurrent uploads
-    if _UPLOAD_IN_PROGRESS:
-        raise RuntimeError("Upload already in progress")
+    uploader = SimpleDriveUploader(skip_existing=skip_existing)
     
-    # Check requirements upfront without calling get_drive_service multiple times
-    if not IN_COLAB:
-        raise RuntimeError("Not running in Google Colab environment")
+    results = uploader.upload_to_drive(local_path, folder_id)
+    uploader.print_summary(results)
     
-    if _DRIVE_SERVICE is None:
-        # Show detailed instructions only once
-        print("\n" + "="*60)
-        print("AUTHENTICATION REQUIRED")
-        print("="*60)
-        print("Please run this in a Colab notebook cell first:")
-        print()
-        print("from google.colab import auth")
-        print("from googleapiclient.discovery import build")
-        print("auth.authenticate_user()")
-        print("drive_service = build('drive', 'v3')")
-        print()
-        print("from gdrive_uploader import set_drive_service")
-        print("set_drive_service(drive_service)")
-        print("print('✓ Ready to upload!')")
-        print("="*60)
-        raise RuntimeError("Authentication required")
-        
-    _UPLOAD_IN_PROGRESS = True
-    
-    try:
-        skip_existing = kwargs.get('skip_existing', True)
-        drive_service = kwargs.get('drive_service', _DRIVE_SERVICE)
-        
-        uploader = SimpleDriveUploader(skip_existing=skip_existing, drive_service=drive_service)
-        
-        results = uploader.upload_to_drive(local_path, folder_id)
-        uploader.print_summary(results)
-        
-        return results
-    finally:
-        _UPLOAD_IN_PROGRESS = False
+    return results
