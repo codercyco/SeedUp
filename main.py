@@ -57,17 +57,8 @@ Examples:
   # Clear download session
   python main.py clear
   
-Note: Upload features require Google Colab environment and authentication.
-Run this in a Colab notebook cell first:
-  
-  from google.colab import auth
-  from googleapiclient.discovery import build
-  auth.authenticate_user()
-  drive_service = build('drive', 'v3')
-  
-  from gdrive_uploader import set_drive_service
-  set_drive_service(drive_service)
-  print('✓ Ready to upload!')
+Note: Upload features automatically handle authentication in Google Colab.
+Just run your commands directly - no manual setup required!
         """
     )
     
