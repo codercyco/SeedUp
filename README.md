@@ -32,7 +32,7 @@
 
 ##  Overview
 
-SeedUp is a powerful Python-based tool that seamlessly combines torrent downloading with Google Drive uploading capabilities. Designed for both standalone applications and Google Colab environments, SeedUp allows you to manage large downloads efficiently without consuming your local storage resources.
+SeedUp is a very powerful Python based tool that combines torrent downloading with Google Drive uploading capabilities. It's designed to work both as a standalone application and in Google Colab environments, making it perfect for managing downloads without using local resources.
 
 Perfect for users who need to download large files through torrents and automatically store them in cloud storage, especially useful in resource-constrained environments like Google Colab's free tier.
 
@@ -40,7 +40,7 @@ Perfect for users who need to download large files through torrents and automati
 
 -  **High-speed torrent downloading** using libtorrent
 -  **Automatic Google Drive upload** with seamless authentication
-- ⏸ **Resume capability** for interrupted downloads
+-  **Resume capability** for interrupted downloads
 -  **Real-time progress tracking** with visual progress bars
 -  **Smart duplicate detection** - skip already uploaded files
 -  **Flexible input support** - both magnet links and .torrent files
@@ -130,9 +130,9 @@ SeedUp/
 ├── gdrive_uploader.py      # Google Drive upload functionality
 ├── config.py               # Configuration and constants
 ├── requirements.txt        # Python dependencies
-├── SeedUp.ipynb           # Google Colab notebook
-├── LICENSE                 # GPL v3 license
-└── README.md              # This file
+├── SeedUp.ipynb            # Google Colab notebook
+├── LICENSE                 # Apache License 2.0
+└── README.md               # This file
 ```
 
 ##  Configuration
@@ -152,7 +152,7 @@ Key configuration options in `config.py`:
 
 ```python
 TORRENT_DOWNLOAD_PATH = "../SeedUp Downloads"  # Default download path
-CHUNK_SIZE = 100 * 1024 * 1024                # 100MB upload chunks
+CHUNK_SIZE = 100 * 1024 * 1024                 # 100MB upload chunks
 MAX_RETRIES = 3                                # Upload retry attempts
 LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024      # 1GB threshold
 ```
@@ -181,18 +181,12 @@ LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024      # 1GB threshold
 - **Runtime Limit**: ~12 hours maximum session
 - **Disk Space**: Limited to ~100GB temporary storage
 - **Session Management**: May disconnect if idle
-- **Network Speed**: Variable depending on Colab allocation
 
-### Best Practices
-1. **Monitor sessions** for long downloads
-2. **Use resume capability** for interrupted downloads
-3. **Clear downloads folder** after successful uploads
-4. **Respect Drive storage quotas**
-5. **Test with small files first**
+
 
 ##  Contributing
 
-We welcome contributions! Please:
+I welcome contributions!
 
 1. Fork the repository
 2. Create a feature branch
@@ -217,7 +211,7 @@ This project is licensed under the **Apache License 2.0** - see the [LICENSE](LI
 
 ##  Acknowledgments
 
-- **libtorrent** team for the excellent torrent library
+- **[libtorrent](https://github.com/arvidn/libtorrent)** team for the excellent torrent library
 - **Google** for Colab platform and Drive API
 - **Python community** for amazing ecosystem
 - **Open source contributors** who make projects like this possible
@@ -232,7 +226,7 @@ This project is licensed under the **Apache License 2.0** - see the [LICENSE](LI
 
 <div align="center">
 
-**Made with ❤️ for the BashByte community**
+**Made with ❤️ for the community**
 
 **Created by [Ishara Deshapriya](https://www.linkedin.com/in/isharadeshapriya/)**
 
