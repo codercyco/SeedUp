@@ -79,6 +79,52 @@ def get_drive_service():
         raise RuntimeError(f"Failed to authenticate Google Drive: {str(e)}")
 
 
+def get_or_create_seedup_folder(drive_service) -> Optional[str]:
+    """
+    Get or create the 'SeedUp Downloads' folder in the root of Google Drive.
+    
+    Args:
+        drive_service: Authenticated Google Drive service object
+        
+    Returns:
+        Folder ID of the SeedUp Downloads folder, or None if failed
+    """
+    try:
+        # Search for existing SeedUp Downloads folder in root
+        query = "name='SeedUp Downloads' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents"
+        
+        results = drive_service.files().list(
+            q=query,
+            fields='files(id, name)',
+            pageSize=1
+        ).execute()
+        
+        folders = results.get('files', [])
+        if folders:
+            logger.info(f"Found existing SeedUp Downloads folder: {folders[0]['id']}")
+            return folders[0]['id']
+        
+        # Create new SeedUp Downloads folder if not found
+        folder_metadata = {
+            'name': 'SeedUp Downloads',
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        folder = drive_service.files().create(
+            body=folder_metadata,
+            fields='id'
+        ).execute()
+        folder_id = folder.get('id')
+        logger.info(f"Created new SeedUp Downloads folder: {folder_id}")
+        return folder_id
+        
+    except HttpError as e:
+        logger.error(f"Error getting/creating SeedUp Downloads folder: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error getting/creating SeedUp Downloads folder: {str(e)}")
+        return None
+
+
 # For backward compatibility - these functions are no longer needed but kept for existing code
 def set_drive_service(service):
     """Legacy function - no longer needed with automatic authentication."""
@@ -87,18 +133,27 @@ def set_drive_service(service):
 class SimpleDriveUploader:
     """Simplified Google Drive uploader with progress bars and skip existing feature."""
     
-    def __init__(self, skip_existing: bool = True):
+    def __init__(self, skip_existing: bool = True, use_seedup_folder: bool = True):
         """
         Initialize the uploader with automatic authentication.
         
         Args:
             skip_existing: If True, skip files that already exist in Drive
+            use_seedup_folder: If True, automatically create/use SeedUp Downloads folder in Drive root
             
         Raises:
             RuntimeError: If not in Colab or authentication fails
         """
         self.drive_service = get_drive_service()
         self.skip_existing = skip_existing
+        self.use_seedup_folder = use_seedup_folder
+        self.seedup_folder_id = None
+        
+        # Get or create SeedUp Downloads folder if enabled
+        if self.use_seedup_folder:
+            self.seedup_folder_id = get_or_create_seedup_folder(self.drive_service)
+            if not self.seedup_folder_id:
+                raise RuntimeError("Failed to create/access SeedUp Downloads folder in Google Drive")
     
     def file_exists(self, file_name: str, parent_id: str) -> Optional[Dict]:
         """
@@ -303,6 +358,7 @@ class SimpleDriveUploader:
         Args:
             local_path: Path to the local file or folder
             parent_id: Google Drive folder ID where content will be uploaded
+                       (Will be used as subfolder under SeedUp Downloads if use_seedup_folder is True)
             
         Returns:
             Dictionary with 'success', 'failed', 'skipped' lists and 'root_folder_id'
@@ -316,6 +372,10 @@ class SimpleDriveUploader:
         
         # Initialize progress tracking on first call
         if _progress_bar is None:
+            # Use SeedUp Downloads folder as parent only on the initial call
+            if self.use_seedup_folder and self.seedup_folder_id:
+                parent_id = self.seedup_folder_id
+                results['root_folder_id'] = parent_id
             stats = self.count_items(local_path)
             _total_size = stats['total_size']
             _file_count[1] = stats['files']  # total files
@@ -425,15 +485,17 @@ class SimpleDriveUploader:
         print("="*60)
 
 
-def upload_to_google_drive(local_path: str, folder_id: str, **kwargs):
+def upload_to_google_drive(local_path: str, folder_id: str = None, **kwargs):
     """
     Upload files to Google Drive with automatic authentication.
+    Automatically creates/uses a 'SeedUp Downloads' folder in Google Drive root.
     
     Args:
         local_path: Path to file or folder to upload
-        folder_id: Google Drive destination folder ID
+        folder_id: Google Drive destination folder ID (optional, defaults to SeedUp Downloads folder)
         **kwargs: Additional options:
             - skip_existing (bool): Skip files that already exist (default: True)
+            - use_seedup_folder (bool): Use SeedUp Downloads folder in Drive root (default: True)
         
     Returns:
         Dictionary with 'success', 'failed', and 'skipped' lists
@@ -442,8 +504,14 @@ def upload_to_google_drive(local_path: str, folder_id: str, **kwargs):
         RuntimeError: If not in Colab or authentication fails
     """
     skip_existing = kwargs.get('skip_existing', True)
+    use_seedup_folder = kwargs.get('use_seedup_folder', True)
     
-    uploader = SimpleDriveUploader(skip_existing=skip_existing)
+    uploader = SimpleDriveUploader(skip_existing=skip_existing, use_seedup_folder=use_seedup_folder)
+    
+    # Use provided folder_id or default to SeedUp folder
+    if folder_id is None:
+        folder_id = uploader.seedup_folder_id if use_seedup_folder else 'root'
+    
     results = uploader.upload_to_drive(local_path, folder_id)
     
     # Get the root folder ID for the summary link

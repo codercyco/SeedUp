@@ -108,7 +108,7 @@ Just run your commands directly - no manual setup required!
     download_parser.add_argument(
         '-f', '--folder-id',
         type=str,
-        help='Google Drive folder ID (required with --upload)'
+        help='Google Drive folder ID (optional, defaults to SeedUp Downloads folder in Drive root)'
     )
     download_parser.add_argument(
         '--no-skip',
@@ -127,8 +127,7 @@ Just run your commands directly - no manual setup required!
     upload_parser.add_argument(
         '-f', '--folder-id',
         type=str,
-        required=True,
-        help='Google Drive destination folder ID'
+        help='Google Drive destination folder ID (optional, defaults to SeedUp Downloads folder in Drive root)'
     )
     upload_parser.add_argument(
         '--no-skip',
@@ -150,11 +149,6 @@ def handle_download(args):
     print("="*60)
     print("TORRENT DOWNLOADER")
     print("="*60)
-    
-    # Check if upload is requested but folder ID is missing
-    if args.upload and not args.folder_id:
-        logger.error("--folder-id is required when using --upload")
-        return 1
     
     # Download the torrent
     logger.info(f"Starting download: {args.torrent}")
@@ -182,7 +176,7 @@ def handle_download(args):
             
             results = upload_to_google_drive(
                 downloaded_path,
-                args.folder_id,
+                args.folder_id,  # Can be None, will use SeedUp folder
                 skip_existing=not args.no_skip
             )
             

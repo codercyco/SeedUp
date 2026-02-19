@@ -93,11 +93,19 @@ python main.py download -t movie.torrent
 
 #### Download and upload to Google Drive:
 ```bash
+# Uploads to 'SeedUp Downloads' folder in Drive root (created automatically)
+python main.py download -t "magnet:?xt=urn:btih:..." --upload
+
+# Upload to a specific folder (optional)
 python main.py download -t "magnet:?xt=urn:btih:..." --upload -f FOLDER_ID
 ```
 
 #### Upload existing files to Google Drive:
 ```bash
+# Uploads to 'SeedUp Downloads' folder in Drive root (created automatically)
+python main.py upload -p /path/to/folder
+
+# Upload to a specific folder (optional)
 python main.py upload -p /path/to/folder -f FOLDER_ID
 ```
 
@@ -116,7 +124,15 @@ python main.py clear
 - `--no-resume`: Start fresh download (ignore previous session)
 - `--no-skip`: Force re-upload even if files exist in Drive
 - `-d PATH`: Custom download destination
-- `-f FOLDER_ID`: Google Drive folder ID for uploads
+- `-f FOLDER_ID`: Google Drive folder ID for uploads (optional - defaults to SeedUp Downloads folder in Drive root)
+
+##  Features
+
+### Automatic SeedUp Downloads Folder
+- **Auto-creates 'SeedUp Downloads' folder** in your Google Drive root directory
+- **Smart detection** - uses existing folder if already present
+- **Optional custom folders** - you can still specify a different folder ID if needed
+- All uploads go to SeedUp Downloads folder by default for organized storage
 
 ##  Project Structure
 
@@ -135,13 +151,21 @@ SeedUp/
 ##  Configuration
 
 ### Google Drive Setup
+
+**No manual setup required!** SeedUp automatically:
+1. Creates a 'SeedUp Downloads' folder in your Google Drive root (or uses existing one)
+2. Handles authentication in Google Colab automatically
+3. Uploads all files to the SeedUp Downloads folder by default
+
+**Optional: Using a Custom Folder**
 1. **Get Folder ID:**
    - Open [Google Drive](https://drive.google.com)
    - Navigate to your target folder
    - Copy the folder ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`
-
-2. **Authentication:**
-   - Automatic authentication via `google.colab.auth`
+2. **Use with -f flag:**
+   ```bash
+   python main.py download -t "magnet..." --upload -f YOUR_FOLDER_ID
+   ```
 
 ### Environment Variables
 Key configuration options in `config.py`:
