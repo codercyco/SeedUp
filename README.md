@@ -1,4 +1,4 @@
-# SeedUp - Smart Torrent Management V1.0
+# SeedUp - Smart Torrent Management V1
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/codercyco/SeedUp/blob/main/SeedUp.ipynb)
 
@@ -22,9 +22,6 @@
     </a>
     <a href="https://www.youtube.com/@0xbashbyte" target="_blank">
       <img src="https://img.shields.io/badge/Subscribe-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Subscribe on YouTube" height="30">
-    </a>
-    <a href="https://whatsapp.com/channel/0029Vb6SY8iBPzjWxxQCYN2R" target="_blank">
-      <img src="https://img.shields.io/badge/Join-Community-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Join WhatsApp Community" height="30">
     </a>
   </div>
 
@@ -144,8 +141,7 @@ SeedUp/
    - Copy the folder ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`
 
 2. **Authentication:**
-   - In Colab: Automatic authentication via `google.colab.auth`
-   - Local: Manual OAuth2 flow (credentials required)
+   - Automatic authentication via `google.colab.auth`
 
 ### Environment Variables
 Key configuration options in `config.py`:
