@@ -372,10 +372,6 @@ class SimpleDriveUploader:
         
         # Initialize progress tracking on first call
         if _progress_bar is None:
-            # Use SeedUp Downloads folder as parent only on the initial call
-            if self.use_seedup_folder and self.seedup_folder_id:
-                parent_id = self.seedup_folder_id
-                results['root_folder_id'] = parent_id
             stats = self.count_items(local_path)
             _total_size = stats['total_size']
             _file_count[1] = stats['files']  # total files
@@ -504,18 +500,15 @@ def upload_to_google_drive(local_path: str, folder_id: str = None, **kwargs):
         RuntimeError: If not in Colab or authentication fails
     """
     skip_existing = kwargs.get('skip_existing', True)
-    use_seedup_folder = kwargs.get('use_seedup_folder', True)
-    
+    use_seedup_folder = (folder_id is None)
+
     uploader = SimpleDriveUploader(skip_existing=skip_existing, use_seedup_folder=use_seedup_folder)
-    
-    # Use provided folder_id or default to SeedUp folder
+
+    # Resolve destination: custom folder_id takes priority
     if folder_id is None:
         folder_id = uploader.seedup_folder_id if use_seedup_folder else 'root'
-    
+
     results = uploader.upload_to_drive(local_path, folder_id)
-    
-    # Get the root folder ID for the summary link
     root_folder_id = results.get('root_folder_id', folder_id)
     uploader.print_summary(results, root_folder_id)
-    
     return results
