@@ -1,37 +1,13 @@
 # SeedUp - Smart Torrent Management V1
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/codercyco/SeedUp/blob/main/SeedUp.ipynb)
-
-<div align="center">
-
-<br>
-<a href="https://www.buymeacoffee.com/codercyco" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" width="300">
-</a>
-
-<br>
-
-### 🌐 **Connect & Stay Updated**
-
-  <div style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
-    <a href="https://www.linkedin.com/in/isharadeshapriya/" target="_blank">
-      <img src="https://img.shields.io/badge/Follow-LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Follow on LinkedIn" height="30">
-    </a>
-    <a href="https://www.linkedin.com/newsletters/7355638830797901825/" target="_blank">
-      <img src="https://img.shields.io/badge/Subscribe-Newsletter-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Subscribe to Newsletter" height="30">
-    </a>
-    <a href="https://www.youtube.com/@0xbashbyte" target="_blank">
-      <img src="https://img.shields.io/badge/Subscribe-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Subscribe on YouTube" height="30">
-    </a>
-  </div>
-
-</div>
 
 ##  Overview
 
 SeedUp is a very powerful Python based tool that combines torrent downloading with Google Drive uploading capabilities. It's designed to work both as a standalone application and in Google Colab environments, making it perfect for managing downloads without using local resources.
 
 Perfect for users who need to download large files through torrents and automatically store them in cloud storage, especially useful in resource-constrained environments like Google Colab's free tier.
+
+<br>
 
 ##  Features
 
@@ -46,10 +22,15 @@ Perfect for users who need to download large files through torrents and automati
 -  **Organized uploads** with configurable destination folders
 -  **Command-line interface** for advanced users
 
+<br>
+
 ##  Installation
 
 ### For Google Colab (Recommended)
-Simply open the [SeedUp Colab Notebook](https://colab.research.google.com/github/codercyco/SeedUp/blob/main/SeedUp.ipynb) and follow the step-by-step guide. No manual installation required!
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/codercyco/SeedUp/blob/main/SeedUp.ipynb)
+
+Simply open the notebook above and follow the step-by-step guide. No manual installation required!
 
 ### For Local Installation
 
@@ -79,7 +60,7 @@ Simply open the [SeedUp Colab Notebook](https://colab.research.google.com/github
 
 ## Quick Start
 ### In Google Colab (Easiest)
-1. Click here to Open [SeedUp Colab Notebook](https://colab.research.google.com/github/codercyco/SeedUp/blob/main/SeedUp.ipynb)
+1. Open [SeedUp Colab Notebook](https://colab.research.google.com/github/codercyco/SeedUp/blob/main/SeedUp.ipynb)
 2. Follow the step-by-step cells
 3. Authentication and setup is handled automatically
 
@@ -126,6 +107,8 @@ python main.py clear
 - `-d PATH`: Custom download destination
 - `-f FOLDER_ID`: Google Drive folder ID for uploads (optional - defaults to SeedUp Downloads folder in Drive root)
 
+<br>
+
 ##  Features
 
 ### Automatic SeedUp Downloads Folder
@@ -133,6 +116,8 @@ python main.py clear
 - **Smart detection** - uses existing folder if already present
 - **Optional custom folders** - you can still specify a different folder ID if needed
 - All uploads go to SeedUp Downloads folder by default for organized storage
+
+<br>
 
 ##  Project Structure
 
@@ -147,6 +132,8 @@ SeedUp/
 ├── LICENSE                 # Apache License 2.0
 └── README.md               # This file
 ```
+
+<br>
 
 ##  Configuration
 
@@ -176,6 +163,7 @@ CHUNK_SIZE = 100 * 1024 * 1024                 # 100MB upload chunks
 MAX_RETRIES = 3                                # Upload retry attempts
 LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024      # 1GB threshold
 ```
+<br>
 
 ##  Use Cases
 
@@ -188,6 +176,8 @@ LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024      # 1GB threshold
 - ✅ **Local Linux/macOS** (With proper dependencies)
 - ✅ **WSL on Windows** (Linux subsystem)
 - ❌ **Native Windows** (libtorrent limitations)
+
+<br>
 
 ##  Important Considerations
 
@@ -202,11 +192,11 @@ LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024      # 1GB threshold
 - **Disk Space**: Limited to ~100GB temporary storage
 - **Session Management**: May disconnect if idle
 
-
+<br>
 
 ##  Contributing
 
-I welcome contributions!
+I welcome contributions! Found a bug or have a suggestion? **[Report an Issue](https://github.com/codercyco/SeedUp/issues)**
 
 1. Fork the repository
 2. Create a feature branch
@@ -214,20 +204,13 @@ I welcome contributions!
 4. Test thoroughly
 5. Submit a pull request
 
-
+<br>
 
 ##  License
 
 This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
 
-### What this means:
-- ✅ **Commercial Use** - You can use this software commercially
-- ✅ **Modification** - You can modify the source code
-- ✅ **Distribution** - You can distribute the software
-- ✅ **Private Use** - You can use it privately
-- ✅ **Patent Grant** - Contributors provide an express grant of patent rights
-- ⚠️ **Trademark Use** - You cannot use contributors' names, logos, or trademarks
-- ⚠️ **Liability** - Software is provided "as is" without warranty
+<br>
 
 ##  Acknowledgments
 
@@ -236,19 +219,38 @@ This project is licensed under the **Apache License 2.0** - see the [LICENSE](LI
 - **Python community** for amazing ecosystem
 - **Open source contributors** who make projects like this possible
 
-##  Links
+---
 
-- **[GitHub Repository](https://github.com/codercyco/SeedUp)**
-- **[Report Issues](https://github.com/codercyco/SeedUp/issues)**
-- **[Colab Notebook](https://colab.research.google.com/github/codercyco/SeedUp/blob/main/SeedUp.ipynb)**
+### 🌐 **Connect & Stay Updated**
+
+  <div style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <a href="https://www.linkedin.com/in/isharadeshapriya/" target="_blank">
+      <img src="https://img.shields.io/badge/Follow-LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Follow on LinkedIn" height="30">
+    </a>
+    <a href="https://www.linkedin.com/newsletters/7355638830797901825/" target="_blank">
+      <img src="https://img.shields.io/badge/Subscribe-Newsletter-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="Subscribe to Newsletter" height="30">
+    </a>
+    <a href="https://www.youtube.com/@0xbashbyte" target="_blank">
+      <img src="https://img.shields.io/badge/Subscribe-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Subscribe on YouTube" height="30">
+    </a>
+  </div>
+
+---
+
+**Liked it? You can buy me a coffee**
+
+<a href="https://www.buymeacoffee.com/codercyco" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" width="200">
+</a>
 
 ---
 
 <div align="center">
 
+<br>
+
 **Made with ❤️ for the community**
 
 **Created by [Ishara Deshapriya](https://www.linkedin.com/in/isharadeshapriya/)**
 
-**Licensed under Apache License 2.0**
 </div>
